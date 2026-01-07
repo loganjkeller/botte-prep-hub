@@ -165,7 +165,7 @@ for (const loc of locs){
     tdItem.innerHTML = `<div style="font-weight:800">${item.name}</div><div class="muted" style="font-size:12px">${item.unit}</div>`;
     tr.appendChild(tdItem);
 
-    for (const loc of state.locations){
+    for (const loc of locs){
       const key = `${loc.id}|${item.id}`;
       const val = state.qtyMap[key] ?? 0;
 
@@ -185,6 +185,11 @@ setTimeout(()=>{ // attach listeners after element exists
   const locked = String(state.plan.status || "").toUpperCase() === "LOCKED";
   $("btnSave").disabled = locked;
   setPill(locked ? "LOCKED" : "DRAFT", locked ? "locked" : "ok");
+  // disable all inputs when locked
+document.querySelectorAll("#gridBody input").forEach(inp => {
+  inp.disabled = locked;
+});
+
 }
 
 async function loadPlan(){
@@ -216,6 +221,7 @@ async function savePlan(){
   const res = await api({ action:"bulkSetBaseQty", plan_id: Number(state.plan.plan_id), entries });
   if (!res.ok) throw new Error(res.error || "Save failed");
   setPill("Saved ✅", "ok");
+  await loadPlan();
   setTimeout(()=>setPill("DRAFT","ok"), 1200);
   dirty = false;
 $("btnSave").textContent = "Save";
