@@ -101,7 +101,7 @@ function markDirty(){
   $("btnSave").textContent = "Save • Unsaved";
   if (autosaveTimer) clearTimeout(autosaveTimer);
   autosaveTimer = setTimeout(()=>{
-    savePlan().catch(()=>{});
+    savePlan({ reload:false }).catch(()=>{});
   }, 900);
 }
 
@@ -205,11 +205,11 @@ async function loadPlan(){
   renderGrid();
 }
 
-async function savePlan(){
+async function savePlan(opts = { reload:true }){
   const locked = String(state.plan.status || "").toUpperCase() === "LOCKED";
   if (locked) return;
 
-  const inputs = Array.from(document.querySelectorAll("tbody input"));
+  const inputs = Array.from(document.querySelectorAll("#gridBody input"));
   const entries = inputs.map(inp => ({
     location_id: Number(inp.dataset.loc),
     item_id: Number(inp.dataset.item),
@@ -217,17 +217,27 @@ async function savePlan(){
   }));
 
   setPill("Saving…");
-  const res = await api({ action:"bulkSetBaseQty", plan_id: Number(state.plan.plan_id), entries });
+  const res = await api({
+    action:"bulkSetBaseQty",
+    plan_id: Number(state.plan.plan_id),
+    entries
+  });
+
   if (!res.ok) throw new Error(res.error || "Save failed");
-  setPill("Saved ✅", "ok");
-  await loadPlan();
-  setTimeout(()=>{
-  const lockedNow = String(state.plan.status || "").toUpperCase() === "LOCKED";
-  setPill(lockedNow ? "LOCKED" : "DRAFT", lockedNow ? "locked" : "ok");
-  }, 800);
+
   dirty = false;
   $("btnSave").textContent = "Save";
+  setPill("Saved ✅", "ok");
 
+  // Only reload when user clicks Save manually (not autosave)
+  if (opts.reload) {
+    await loadPlan();
+  } else {
+    setTimeout(()=>{
+      const lockedNow = String(state.plan.status || "").toUpperCase() === "LOCKED";
+      setPill(lockedNow ? "LOCKED" : "DRAFT", lockedNow ? "locked" : "ok");
+    }, 600);
+  }
 }
 
 async function lockPlan(){
@@ -239,7 +249,7 @@ async function lockPlan(){
 
 $("planDate").value = nextWednesdayISO();
 $("btnLoad").onclick = ()=>loadPlan().catch(e=>setPill("Error ❌","locked"));
-$("btnSave").onclick = ()=>savePlan().catch(e=>setPill("Error ❌","locked"));
+$("btnSave").onclick = ()=>savePlan({ reload:true }).catch(e=>setPill("Error ❌","locked"));
 $("btnLock").onclick = ()=>lockPlan().catch(e=>setPill("Error ❌","locked"));
 $("search").addEventListener("input", ()=>renderGrid());
 $("toggleUES").addEventListener("change", ()=>renderGrid());
