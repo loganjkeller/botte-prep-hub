@@ -93,6 +93,29 @@ async function api(payload) {
 
 const $ = (id)=>document.getElementById(id);
 const state = { plan:null, locations:[], items:[], qtyMap:{} };
+let dirty = false;
+let autosaveTimer = null;
+
+function markDirty(){
+  dirty = true;
+  $("btnSave").textContent = "Save • Unsaved";
+  if (autosaveTimer) clearTimeout(autosaveTimer);
+  autosaveTimer = setTimeout(()=>{
+    savePlan().catch(()=>{});
+  }, 900);
+}
+
+function filteredItems(){
+  const q = ($("search").value || "").trim().toLowerCase();
+  if (!q) return state.items;
+  return state.items.filter(it => String(it.name).toLowerCase().includes(q));
+}
+
+function filteredLocations(){
+  const showUES = $("toggleUES").checked;
+  if (showUES) return state.locations;
+  return state.locations.filter(l => String(l.name).toUpperCase() !== "BOTTE UES");
+}  
 
 function nextWednesdayISO(){
   const d = new Date();
@@ -123,14 +146,18 @@ function renderGrid(){
   th0.className = "itemcell";
   trh.appendChild(th0);
 
-  for (const loc of state.locations){
+  const locs = filteredLocations();
+const items = filteredItems();
+
+for (const loc of locs){
+
     const th = document.createElement("th");
     th.textContent = loc.name;
     trh.appendChild(th);
   }
   head.appendChild(trh);
 
-  for (const item of state.items){
+  for (const item of items){
     const tr = document.createElement("tr");
 
     const tdItem = document.createElement("td");
@@ -144,6 +171,11 @@ function renderGrid(){
 
       const td = document.createElement("td");
       td.innerHTML = `<input type="number" min="0" step="1" value="${val}" data-loc="${loc.id}" data-item="${item.id}">`;
+setTimeout(()=>{ // attach listeners after element exists
+  const inp = td.querySelector("input");
+  inp.addEventListener("input", markDirty);
+}, 0);
+
       tr.appendChild(td);
     }
 
@@ -185,6 +217,9 @@ async function savePlan(){
   if (!res.ok) throw new Error(res.error || "Save failed");
   setPill("Saved ✅", "ok");
   setTimeout(()=>setPill("DRAFT","ok"), 1200);
+  dirty = false;
+$("btnSave").textContent = "Save";
+
 }
 
 async function lockPlan(){
@@ -198,6 +233,9 @@ $("planDate").value = nextWednesdayISO();
 $("btnLoad").onclick = ()=>loadPlan().catch(e=>setPill("Error ❌","locked"));
 $("btnSave").onclick = ()=>savePlan().catch(e=>setPill("Error ❌","locked"));
 $("btnLock").onclick = ()=>lockPlan().catch(e=>setPill("Error ❌","locked"));
+$("search").addEventListener("input", ()=>renderGrid());
+$("toggleUES").addEventListener("change", ()=>renderGrid());
+
 
 loadPlan().catch(()=>setPill("Error ❌","locked"));
 </script>
