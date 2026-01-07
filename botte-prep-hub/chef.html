@@ -3,8 +3,28 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Botte Restaurants® • Chef</title>
-  <link rel="stylesheet" href=".botte-prep-hub/assets/app.css" />
+  <title>Botte Ops • Chef</title>
+  <link rel="stylesheet" href="./assets/app.css" />
+  <style>
+    .toolbar{display:flex; gap:10px; flex-wrap:wrap; align-items:end}
+    .toolbar .field{display:flex; flex-direction:column; gap:8px}
+    .btnrow{display:flex; gap:10px; flex-wrap:wrap}
+    .tablewrap{margin-top:14px; overflow:auto; border:1px solid var(--line); border-radius:14px}
+    table{width:100%; border-collapse:collapse; min-width:820px}
+    th,td{padding:10px; border-bottom:1px solid var(--line); vertical-align:middle}
+    th{position:sticky; top:0; background:rgba(15,22,36,.95); backdrop-filter: blur(8px); text-align:left}
+    td input{width:90px; padding:10px; border-radius:12px; border:1px solid var(--line); background:rgba(255,255,255,.03); color:var(--text)}
+    .itemcell{min-width:240px}
+    .pill{display:inline-flex; padding:6px 10px; border-radius:999px; border:1px solid var(--line); color:var(--muted); font-size:12px}
+    .locked{border-color: rgba(255,90,122,.6); color: #ffd0da}
+    .ok{border-color: rgba(53,208,166,.55); color: #c8fff2}
+    .toast{margin-top:12px; padding:10px 12px; border:1px solid var(--line); border-radius:14px; background:rgba(0,0,0,.18)}
+    @media (max-width:760px){
+      table{min-width:680px}
+      td input{width:70px}
+      .itemcell{min-width:200px}
+    }
+  </style>
 </head>
 <body>
   <div class="app">
@@ -12,34 +32,40 @@
       <a class="back" href="./index.html">←</a>
       <div>
         <div class="brand-title">Chef</div>
-        <div class="brand-sub">Prep Plan</div>
+        <div class="brand-sub">Plan builder</div>
       </div>
-      <div></div>
+      <div id="statusPill" class="pill">Loading…</div>
     </header>
 
     <main class="card">
-      <h1>Create Plan</h1>
-      <p class="muted">This creates the plan rows in the Google Sheet for that date.</p>
+      <div class="toolbar">
+        <div class="field" style="min-width:220px">
+          <div class="label">Plan date (Wednesday)</div>
+          <input id="planDate" class="input" />
+        </div>
 
-      <div class="row">
-        <label class="label">Plan date (YYYY-MM-DD)</label>
-        <input id="planDate" class="input" placeholder="2026-01-07" />
+        <div class="btnrow">
+          <button class="btn btn-primary" id="btnLoad">Load</button>
+          <button class="btn" id="btnSave">Save</button>
+          <button class="btn" id="btnLock">Lock Plan</button>
+        </div>
       </div>
 
-      <button id="btnCreate" class="btn btn-primary">Create Plan</button>
+      <div class="toast muted" id="toast">Tip: Scroll horizontally to see all locations.</div>
 
-      <div class="spacer"></div>
-      <div id="status" class="status muted">Ready.</div>
-
-      <pre id="out" class="codebox"></pre>
+      <div class="tablewrap">
+        <table id="grid">
+          <thead id="gridHead"></thead>
+          <tbody id="gridBody"></tbody>
+        </table>
+      </div>
     </main>
 
-    <footer class="footer muted">Botte Restaurants® • Chef </footer>
+    <footer class="footer muted">Botte Ops • Chef</footer>
   </div>
 
 <script>
 async function api(payload) {
-  // Calls Cloudflare Function at /api (we will create it)
   const res = await fetch("/api", {
     method: "POST",
     headers: {"Content-Type":"application/json"},
@@ -50,15 +76,12 @@ async function api(payload) {
   catch { throw new Error("Non-JSON response: " + text.slice(0, 300)); }
 }
 
-const outEl = document.getElementById("out");
-const statusEl = document.getElementById("status");
-function setStatus(msg){ statusEl.textContent = msg; }
-function setOut(obj){ outEl.textContent = obj ? JSON.stringify(obj, null, 2) : ""; }
+const $ = (id)=>document.getElementById(id);
+const state = { plan:null, locations:[], items:[], qtyMap:{} };
 
-function defaultNextWednesday() {
+function nextWednesdayISO(){
   const d = new Date();
-  // next Wednesday (0=Sun..3=Wed)
-  const target = 3;
+  const target = 3; // Wed
   const diff = (target + 7 - d.getDay()) % 7 || 7;
   d.setDate(d.getDate() + diff);
   const y = d.getFullYear();
@@ -66,22 +89,103 @@ function defaultNextWednesday() {
   const day = String(d.getDate()).padStart(2,"0");
   return `${y}-${m}-${day}`;
 }
-document.getElementById("planDate").value = defaultNextWednesday();
 
-document.getElementById("btnCreate").onclick = async () => {
-  try {
-    const plan_date = document.getElementById("planDate").value.trim();
-    if (!plan_date) { setStatus("Enter a date."); return; }
-    setStatus("Creating plan...");
-    setOut(null);
-    const data = await api({ action: "createPlan", plan_date });
-    setOut(data);
-    setStatus(data.ok ? "Done ✅" : "Error ❌");
-  } catch (e) {
-    setStatus("Error ❌");
-    setOut({ ok:false, error: e?.message || String(e) });
+function setPill(text, cls){
+  const el = $("statusPill");
+  el.textContent = text;
+  el.className = "pill " + (cls || "");
+}
+
+function renderGrid(){
+  const head = $("gridHead");
+  const body = $("gridBody");
+  head.innerHTML = "";
+  body.innerHTML = "";
+
+  const trh = document.createElement("tr");
+  const th0 = document.createElement("th");
+  th0.textContent = "Item";
+  th0.className = "itemcell";
+  trh.appendChild(th0);
+
+  for (const loc of state.locations){
+    const th = document.createElement("th");
+    th.textContent = loc.name;
+    trh.appendChild(th);
   }
-};
+  head.appendChild(trh);
+
+  for (const item of state.items){
+    const tr = document.createElement("tr");
+
+    const tdItem = document.createElement("td");
+    tdItem.className = "itemcell";
+    tdItem.innerHTML = `<div style="font-weight:800">${item.name}</div><div class="muted" style="font-size:12px">${item.unit}</div>`;
+    tr.appendChild(tdItem);
+
+    for (const loc of state.locations){
+      const key = `${loc.id}|${item.id}`;
+      const val = state.qtyMap[key] ?? 0;
+
+      const td = document.createElement("td");
+      td.innerHTML = `<input type="number" min="0" step="1" value="${val}" data-loc="${loc.id}" data-item="${item.id}">`;
+      tr.appendChild(td);
+    }
+
+    body.appendChild(tr);
+  }
+
+  const locked = String(state.plan.status || "").toUpperCase() === "LOCKED";
+  $("btnSave").disabled = locked;
+  setPill(locked ? "LOCKED" : "DRAFT", locked ? "locked" : "ok");
+}
+
+async function loadPlan(){
+  const plan_date = $("planDate").value.trim();
+  setPill("Loading…");
+  const res = await api({ action:"getChefPlan", plan_date });
+  if (!res.ok) throw new Error(res.error || "Load failed");
+
+  state.plan = res.plan;
+  state.locations = res.locations;
+  state.items = res.items;
+  state.qtyMap = res.qtyMap || {};
+
+  renderGrid();
+}
+
+async function savePlan(){
+  const locked = String(state.plan.status || "").toUpperCase() === "LOCKED";
+  if (locked) return;
+
+  const inputs = Array.from(document.querySelectorAll("tbody input"));
+  const entries = inputs.map(inp => ({
+    location_id: Number(inp.dataset.loc),
+    item_id: Number(inp.dataset.item),
+    qty_base: Number(inp.value || 0)
+  }));
+
+  setPill("Saving…");
+  const res = await api({ action:"bulkSetBaseQty", plan_id: Number(state.plan.plan_id), entries });
+  if (!res.ok) throw new Error(res.error || "Save failed");
+  setPill("Saved ✅", "ok");
+  setTimeout(()=>setPill("DRAFT","ok"), 1200);
+}
+
+async function lockPlan(){
+  setPill("Locking…");
+  const res = await api({ action:"lockPlan", plan_id: Number(state.plan.plan_id), locked_by:"chef" });
+  if (!res.ok) throw new Error(res.error || "Lock failed");
+  await loadPlan();
+}
+
+$("planDate").value = nextWednesdayISO();
+$("btnLoad").onclick = ()=>loadPlan().catch(e=>setPill("Error ❌","locked"));
+$("btnSave").onclick = ()=>savePlan().catch(e=>setPill("Error ❌","locked"));
+$("btnLock").onclick = ()=>lockPlan().catch(e=>setPill("Error ❌","locked"));
+
+loadPlan().catch(()=>setPill("Error ❌","locked"));
 </script>
 </body>
 </html>
+
