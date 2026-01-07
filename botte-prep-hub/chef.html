@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Botte Ops • Chef</title>
+  <title>Botte Restaurants® • Chef</title>
   <link rel="stylesheet" href="./assets/app.css" />
   <style>
     .toolbar{display:flex; gap:10px; flex-wrap:wrap; align-items:end}
@@ -39,10 +39,32 @@
 
     <main class="card">
       <div class="toolbar">
-        <div class="field" style="min-width:220px">
-          <div class="label">Plan date (Wednesday)</div>
-          <input id="planDate" class="input" />
-        </div>
+  <div class="field" style="min-width:220px">
+    <div class="label">Plan date (Wednesday)</div>
+    <input id="planDate" class="input" />
+  </div>
+
+  <div class="field" style="min-width:220px">
+    <div class="label">Search item</div>
+    <input id="search" class="input" placeholder="meatballs, vodka, gnocchi..." />
+  </div>
+
+  <div class="field" style="min-width:180px">
+    <div class="label">Locations</div>
+    <label style="display:flex; gap:10px; align-items:center; color:var(--muted); font-size:13px;">
+      <input id="toggleUES" type="checkbox" checked />
+      Show UES
+    </label>
+  </div>
+
+  <div class="btnrow">
+    <button class="btn btn-primary" id="btnLoad">Load</button>
+    <button class="btn" id="btnSave">Save</button>
+    <button class="btn" id="btnLock">Lock Plan</button>
+    <button class="btn" id="btnExtra">Add Extra</button>
+  </div>
+</div>
+
 
         <div class="btnrow">
           <button class="btn btn-primary" id="btnLoad">Load</button>
@@ -61,7 +83,8 @@
       </div>
     </main>
 
-    <footer class="footer muted">Botte Ops • Chef</footer>
+    <footer class="footer muted">Botte Restaurants • Chef</footer>
+    <footer class="footer muted">Wolf By Logan® Technology</footer>
   </div>
 
 <script>
