@@ -171,10 +171,9 @@ for (const loc of locs){
 
       const td = document.createElement("td");
       td.innerHTML = `<input type="number" min="0" step="1" value="${val}" data-loc="${loc.id}" data-item="${item.id}">`;
-setTimeout(()=>{ // attach listeners after element exists
-  const inp = td.querySelector("input");
-  inp.addEventListener("input", markDirty);
-}, 0);
+      const inp = td.querySelector("input");
+      inp.addEventListener("input", markDirty);
+
 
       tr.appendChild(td);
     }
@@ -222,9 +221,12 @@ async function savePlan(){
   if (!res.ok) throw new Error(res.error || "Save failed");
   setPill("Saved ✅", "ok");
   await loadPlan();
-  setTimeout(()=>setPill("DRAFT","ok"), 1200);
+  setTimeout(()=>{
+  const lockedNow = String(state.plan.status || "").toUpperCase() === "LOCKED";
+  setPill(lockedNow ? "LOCKED" : "DRAFT", lockedNow ? "locked" : "ok");
+  }, 800);
   dirty = false;
-$("btnSave").textContent = "Save";
+  $("btnSave").textContent = "Save";
 
 }
 
